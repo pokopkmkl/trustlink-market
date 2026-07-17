@@ -1,0 +1,14 @@
+{
+  "name": "trustlink-market",
+  "version": "1.0.0",
+  "description": "Escrow marketplace for digital goods (game accounts, crypto, gift cards, etc.)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
