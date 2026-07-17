@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My shop — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap">
+  <div id="gate"></div>
+  <div id="app" style="display:none;">
+    <h2 style="margin-top:26px;">Add a new listing</h2>
+    <div class="card mt">
+      <label>Title</label>
+      <input id="title" placeholder="e.g. Steam account — 40 games, Level 120" />
+      <label>Category</label>
+      <input id="category" placeholder="e.g. Game Account, Crypto Wallet, Gift Card" />
+      <label>Description</label>
+      <textarea id="description" placeholder="Details the buyer should know before purchasing"></textarea>
+      <label>Price (USDT)</label>
+      <input id="price" type="number" min="0" step="0.01" />
+      <label>Delivery code / credentials</label>
+      <textarea id="deliveryCode" placeholder="This is only revealed to the buyer after you're paid and admin approves. e.g. login:pass, private key, redeem code..."></textarea>
+      <button class="btn btn-primary mt" id="addBtn" style="margin-top:16px;">List item</button>
+      <div id="addMsg" class="err"></div>
+    </div>
+
+    <h2 style="margin-top:40px;">My listings</h2>
+    <div id="myProducts" class="grid"></div>
+
+    <h2 style="margin-top:40px;">Orders on my listings</h2>
+    <div id="myOrders" class="mt"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+async function load() {
+  const user = await renderNav();
+  const gate = document.getElementById('gate');
+  if (!user || user.role !== 'seller') {
+    gate.innerHTML = `<div class="empty"><h3>Seller account required</h3><p>Log in with a seller account to manage listings.</p></div>`;
+    return;
+  }
+  document.getElementById('app').style.display = 'block';
+
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const body = {
+      title: document.getElementById('title').value.trim(),
+      category: document.getElementById('category').value.trim() || 'Other',
+      description: document.getElementById('description').value.trim(),
+      price: document.getElementById('price').value,
+      deliveryCode: document.getElementById('deliveryCode').value.trim(),
+    };
+    const msg = document.getElementById('addMsg');
+    msg.textContent = '';
+    try {
+      await api('/api/products', { method: 'POST', body });
+      ['title','category','description','price','deliveryCode'].forEach(id => document.getElementById(id).value = '');
+      loadProducts();
+    } catch (e) {
+      msg.textContent = e.message;
+    }
+  });
+
+  loadProducts();
+  loadOrders();
+}
+
+async function loadProducts() {
+  const { products } = await api('/api/seller/products');
+  const grid = document.getElementById('myProducts');
+  if (!products.length) {
+    grid.innerHTML = `<p class="muted small">No listings yet — add your first one above.</p>`;
+    return;
+  }
+  grid.innerHTML = products.map(p => `
+    <div class="product-card">
+      <div class="cat-tag">${escapeHtml(p.category)}</div>
+      <h3 style="font-size:16px;">${escapeHtml(p.title)}</h3>
+      <div class="flex between">
+        <div class="price-tag">${p.price}<span class="u">USDT</span></div>
+        <span class="badge ${badgeClass(p.status)}">${statusLabel(p.status)}</span>
+      </div>
+      ${p.status === 'active' ? `<button class="btn btn-danger small" data-id="${p.id}">Remove listing</button>` : ''}
+    </div>
+  `).join('');
+  grid.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await api('/api/products/' + btn.dataset.id, { method: 'DELETE' });
+      loadProducts();
+    });
+  });
+}
+
+async function loadOrders() {
+  const { orders } = await api('/api/orders');
+  const el = document.getElementById('myOrders');
+  if (!orders.length) {
+    el.innerHTML = `<p class="muted small">No orders yet.</p>`;
+    return;
+  }
+  el.innerHTML = orders.slice().reverse().map(o => `
+    <div class="order-row">
+      <div class="top">
+        <div><b>${escapeHtml(o.productTitle)}</b> <span class="muted small">· buyer: ${escapeHtml(o.buyerUsername)}</span></div>
+        <span class="badge ${badgeClass(o.status)}">${statusLabel(o.status)}</span>
+      </div>
+      <div class="muted small mt">${o.amount} USDT · ordered ${fmtDate(o.createdAt)}</div>
+      <p class="muted small">Payment verification is handled by TrustLink admin. You'll see the status update here once reviewed.</p>
+    </div>
+  `).join('');
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap" style="max-width:780px;">
+  <div id="gate"></div>
+  <div id="app" style="display:none;">
+    <h2 style="margin-top:26px;">Orders awaiting verification</h2>
+    <div id="pendingList" class="mt"></div>
+
+    <h2 style="margin-top:44px;">All orders</h2>
+    <div id="allList" class="mt"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+async function load() {
+  const user = await renderNav();
+  const gate = document.getElementById('gate');
+  if (!user || user.role !== 'admin') {
+    gate.innerHTML = `<div class="empty"><h3>Admin access required</h3></div>`;
+    return;
+  }
+  document.getElementById('app').style.display = 'block';
+  renderAll();
+}
+
+async function renderAll() {
+  const { orders } = await api('/api/orders');
+  const pending = orders.filter(o => o.status === 'submitted');
+  const pendingEl = document.getElementById('pendingList');
+  const allEl = document.getElementById('allList');
+
+  pendingEl.innerHTML = '';
+  if (!pending.length) pendingEl.innerHTML = `<p class="muted small">Nothing waiting on you right now.</p>`;
+  pending.slice().reverse().forEach(o => pendingEl.appendChild(renderPendingCard(o)));
+
+  allEl.innerHTML = orders.slice().reverse().map(o => `
+    <div class="order-row">
+      <div class="top">
+        <div><b>${escapeHtml(o.productTitle)}</b> <span class="muted small">· ${escapeHtml(o.buyerUsername)} → ${escapeHtml(o.sellerUsername)}</span></div>
+        <span class="badge ${badgeClass(o.status)}">${statusLabel(o.status)}</span>
+      </div>
+      <div class="muted small mt">${o.amount} USDT · ${fmtDate(o.createdAt)}${o.txnId ? ' · txn: ' + escapeHtml(o.txnId) : ''}</div>
+    </div>
+  `).join('');
+}
+
+function renderPendingCard(o) {
+  const div = document.createElement('div');
+  div.className = 'order-row';
+  div.innerHTML = `
+    <div class="top">
+      <div><b>${escapeHtml(o.productTitle)}</b> <span class="muted small">· ${o.amount} USDT</span></div>
+      <span class="badge ${badgeClass(o.status)}">${statusLabel(o.status)}</span>
+    </div>
+    <div class="muted small mt">Buyer: ${escapeHtml(o.buyerUsername)} · Seller: ${escapeHtml(o.sellerUsername)}</div>
+    <div class="small mt">Txn ID: <span style="font-family:var(--font-mono);">${escapeHtml(o.txnId || '—')}</span></div>
+    ${o.screenshot ? `<img src="${o.screenshot}" style="max-width:100%;border-radius:8px;margin-top:10px;border:1px solid var(--border);" />` : '<p class="muted small mt">No screenshot uploaded.</p>'}
+    <div class="flex mt" style="margin-top:14px;">
+      <button class="btn btn-primary approveBtn">Approve &amp; release code</button>
+      <button class="btn btn-danger rejectBtn">Reject</button>
+    </div>
+    <div class="err actionMsg"></div>
+  `;
+  div.querySelector('.approveBtn').addEventListener('click', async () => {
+    try {
+      await api(`/api/orders/${o.id}/approve`, { method: 'POST' });
+      renderAll();
+    } catch (e) { div.querySelector('.actionMsg').textContent = e.message; }
+  });
+  div.querySelector('.rejectBtn').addEventListener('click', async () => {
+    const reason = prompt('Reason for rejecting this payment?', 'Transaction not found on-chain') || 'Payment not verified';
+    try {
+      await api(`/api/orders/${o.id}/reject`, { method: 'POST', body: { reason } });
+      renderAll();
+    } catch (e) { div.querySelector('.actionMsg').textContent = e.message; }
+  });
+  return div;
+}
+
+load();
+</script>
+</body>
+</html>

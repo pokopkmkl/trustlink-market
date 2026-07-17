@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Log in — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap">
+  <div class="card form-narrow">
+    <h2>Log in</h2>
+    <p class="muted small mt">New here? <a href="/register.html" style="color:var(--mint);">Create an account</a></p>
+
+    <label>Username</label>
+    <input id="username" autocomplete="username" />
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+
+    <button class="btn btn-primary btn-block mt" id="submitBtn" style="margin-top:22px;">Log in</button>
+    <div id="msg" class="err"></div>
+
+    <p class="muted small mt">Admin demo login: <b>admin</b> / <b>admin123</b></p>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+renderNav();
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  try {
+    const { user } = await api('/api/login', { method: 'POST', body: { username, password } });
+    if (user.role === 'admin') window.location.href = '/admin.html';
+    else if (user.role === 'seller') window.location.href = '/seller.html';
+    else window.location.href = '/index.html';
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+});
+</script>
+</body>
+</html>

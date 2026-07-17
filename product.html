@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Listing — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap" style="max-width:640px;">
+  <div id="content"></div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+let CURRENT_USER = null;
+
+async function load() {
+  CURRENT_USER = await renderNav();
+  const content = document.getElementById('content');
+  try {
+    const { product } = await api('/api/products/' + id);
+    const canBuy = CURRENT_USER && CURRENT_USER.role === 'buyer' && product.status === 'active';
+
+    content.innerHTML = `
+      <div class="card mt" style="margin-top:26px;">
+        <div class="cat-tag">${escapeHtml(product.category)}</div>
+        <h1 style="font-size:24px;margin-top:6px;">${escapeHtml(product.title)}</h1>
+        <div class="flex between mt">
+          <div class="price-tag" style="font-size:26px;">${product.price}<span class="u">USDT</span></div>
+          <span class="badge ${badgeClass(product.status)}">${statusLabel(product.status)}</span>
+        </div>
+        <p class="muted mt">${escapeHtml(product.description || 'No description provided.')}</p>
+        <p class="muted small">Sold by ${escapeHtml(product.sellerUsername)} · listed ${fmtDate(product.createdAt)}</p>
+
+        <div id="actionArea" class="mt"></div>
+      </div>
+    `;
+
+    const actionArea = document.getElementById('actionArea');
+    if (!CURRENT_USER) {
+      actionArea.innerHTML = `<p class="muted small">Log in as a buyer to purchase this listing.</p>
+        <a href="/login.html" class="btn btn-primary mt">Log in to buy</a>`;
+    } else if (CURRENT_USER.role !== 'buyer') {
+      actionArea.innerHTML = `<p class="muted small">Only buyer accounts can purchase listings.</p>`;
+    } else if (product.status !== 'active') {
+      actionArea.innerHTML = `<p class="muted small">This listing is no longer available.</p>`;
+    } else {
+      actionArea.innerHTML = `<button class="btn btn-primary btn-block" id="buyBtn">Buy for ${product.price} USDT</button>
+        <div id="msg" class="err"></div>`;
+      document.getElementById('buyBtn').addEventListener('click', async () => {
+        try {
+          const { order } = await api('/api/orders', { method: 'POST', body: { productId: product.id } });
+          window.location.href = '/orders.html?highlight=' + order.id;
+        } catch (e) {
+          document.getElementById('msg').textContent = e.message;
+        }
+      });
+    }
+  } catch (e) {
+    content.innerHTML = `<div class="empty"><h3>Listing not found</h3><p>${escapeHtml(e.message)}</p></div>`;
+  }
+}
+load();
+</script>
+</body>
+</html>

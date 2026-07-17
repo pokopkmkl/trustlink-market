@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My orders — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap" style="max-width:700px;">
+  <div id="gate"></div>
+  <h2 style="margin-top:26px;" id="heading" style="display:none;">My orders</h2>
+  <div id="ordersList" class="mt"></div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+const highlight = new URLSearchParams(window.location.search).get('highlight');
+let PAYMENT_CFG = null;
+
+async function load() {
+  const user = await renderNav();
+  const gate = document.getElementById('gate');
+  if (!user || user.role !== 'buyer') {
+    gate.innerHTML = `<div class="empty"><h3>Buyer account required</h3><p>Log in with a buyer account to view your orders.</p></div>`;
+    return;
+  }
+  document.getElementById('heading').style.display = 'block';
+  const cfg = await api('/api/config');
+  PAYMENT_CFG = cfg.payment;
+  renderOrders();
+}
+
+async function renderOrders() {
+  const { orders } = await api('/api/orders');
+  const el = document.getElementById('ordersList');
+  if (!orders.length) {
+    el.innerHTML = `<div class="empty"><h3>No orders yet</h3><p>Browse listings and make your first purchase.</p></div>`;
+    return;
+  }
+  el.innerHTML = '';
+  orders.slice().reverse().forEach(o => el.appendChild(renderOrder(o)));
+}
+
+function renderOrder(o) {
+  const div = document.createElement('div');
+  div.className = 'order-row';
+  if (String(o.id) === highlight) div.style.borderColor = 'var(--mint)';
+
+  let inner = `
+    <div class="top">
+      <div><b>${escapeHtml(o.productTitle)}</b></div>
+      <span class="badge ${badgeClass(o.status)}">${statusLabel(o.status)}</span>
+    </div>
+    <div class="muted small mt">${o.amount} USDT · ordered ${fmtDate(o.createdAt)}</div>
+  `;
+
+  if (o.status === 'pending_payment') {
+    inner += `
+      <div class="panel mt">
+        <div class="small muted">Send exactly <b style="color:var(--text);">${o.amount} USDT</b> on <b>${escapeHtml(PAYMENT_CFG.network)}</b> to:</div>
+        <div class="deposit-box mt">${escapeHtml(PAYMENT_CFG.depositAddress)}</div>
+        <label>Transaction ID / hash</label>
+        <input type="text" class="txnInput" placeholder="0x..." />
+        <label>Payment screenshot (optional but recommended)</label>
+        <input type="file" class="fileInput" accept="image/*" />
+        <button class="btn btn-primary mt submitBtn" data-id="${o.id}">Submit payment proof</button>
+        <div class="err submitMsg"></div>
+      </div>
+    `;
+  } else if (o.status === 'submitted') {
+    inner += `<p class="muted small mt">Payment proof submitted — waiting for admin verification. Txn: <span style="font-family:var(--font-mono);">${escapeHtml(o.txnId)}</span></p>`;
+  } else if (o.status === 'completed') {
+    inner += `
+      <div class="mt">
+        <div class="small muted">Delivery code / credentials:</div>
+        <div class="code-box mt">${escapeHtml(o.deliveredCode)}</div>
+      </div>
+    `;
+  } else if (o.status === 'rejected') {
+    inner += `<p class="err mt">Rejected: ${escapeHtml(o.rejectReason || 'Payment could not be verified.')}</p>`;
+  }
+
+  div.innerHTML = inner;
+
+  const submitBtn = div.querySelector('.submitBtn');
+  if (submitBtn) {
+    submitBtn.addEventListener('click', async () => {
+      const txnId = div.querySelector('.txnInput').value.trim();
+      const fileInput = div.querySelector('.fileInput');
+      const msg = div.querySelector('.submitMsg');
+      msg.textContent = '';
+      if (!txnId) { msg.textContent = 'Transaction ID is required.'; return; }
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+      try {
+        let screenshot = null;
+        if (fileInput.files[0]) screenshot = await fileToBase64(fileInput.files[0]);
+        await api(`/api/orders/${o.id}/submit-payment`, { method: 'POST', body: { txnId, screenshot } });
+        renderOrders();
+      } catch (e) {
+        msg.textContent = e.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit payment proof';
+      }
+    });
+  }
+
+  return div;
+}
+
+load();
+</script>
+</body>
+</html>

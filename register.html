@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Create account — TrustLink Market</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap">
+  <div class="card form-narrow">
+    <h2>Create account</h2>
+    <p class="muted small mt">Already have one? <a href="/login.html" style="color:var(--mint);">Log in</a></p>
+
+    <label>I want to</label>
+    <select id="role">
+      <option value="buyer">Buy items</option>
+      <option value="seller">Sell items</option>
+    </select>
+
+    <label>Username</label>
+    <input id="username" autocomplete="username" />
+    <label>Email (optional)</label>
+    <input id="email" type="email" autocomplete="email" />
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="new-password" />
+
+    <button class="btn btn-primary btn-block mt" id="submitBtn" style="margin-top:22px;">Create account</button>
+    <div id="msg" class="err"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+renderNav();
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const role = document.getElementById('role').value;
+  const username = document.getElementById('username').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  if (username.length < 3 || password.length < 6) {
+    msg.textContent = 'Username must be 3+ chars, password 6+ chars.';
+    return;
+  }
+  try {
+    const { user } = await api('/api/register', { method: 'POST', body: { role, username, email, password } });
+    window.location.href = user.role === 'seller' ? '/seller.html' : '/index.html';
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+});
+</script>
+</body>
+</html>

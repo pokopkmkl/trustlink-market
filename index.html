@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TrustLink Market — Escrow marketplace for digital goods</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<nav class="topbar" id="nav"></nav>
+
+<div class="wrap hero">
+  <h1>Trade game accounts &amp; crypto without the trust problem.</h1>
+  <p>Sellers list, buyers pay into escrow, TrustLink verifies the payment, then releases the code. Nobody gets to skip a step.</p>
+
+  <div class="steps panel">
+    <div class="step"><div class="n">01</div><h4>Seller lists</h4><p>Adds the item and a private delivery code.</p></div>
+    <div class="step"><div class="n">02</div><h4>Buyer pays</h4><p>Sends USDT to the escrow address, submits the txn ID.</p></div>
+    <div class="step"><div class="n">03</div><h4>We verify</h4><p>Admin checks the transaction manually.</p></div>
+    <div class="step"><div class="n">04</div><h4>Code released</h4><p>Buyer instantly sees the delivery code.</p></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="flex between">
+    <h2 style="font-size:20px;">Browse listings</h2>
+    <select id="categoryFilter" style="width:auto;">
+      <option value="">All categories</option>
+    </select>
+  </div>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty" style="display:none;">
+    <h3>No listings yet</h3>
+    <p>Be the first seller to list something.</p>
+  </div>
+</div>
+
+<footer>TrustLink Market — a demo escrow marketplace. Verify every transaction manually before releasing funds or codes.</footer>
+
+<script src="/app.js"></script>
+<script>
+let ALL_PRODUCTS = [];
+
+function renderGrid(products) {
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  if (!products.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = products.map(p => `
+    <a class="product-card" href="/product.html?id=${p.id}">
+      <div class="cat-tag">${escapeHtml(p.category)}</div>
+      <h3 style="font-size:16px;">${escapeHtml(p.title)}</h3>
+      <p class="muted small" style="min-height:36px;">${escapeHtml((p.description||'').slice(0,80))}</p>
+      <div class="flex between">
+        <div class="price-tag">${p.price}<span class="u">USDT</span></div>
+        <span class="badge ${badgeClass(p.status)}">${statusLabel(p.status)}</span>
+      </div>
+      <div class="muted small">seller: ${escapeHtml(p.sellerUsername)}</div>
+    </a>
+  `).join('');
+}
+
+async function load() {
+  await renderNav();
+  const { products } = await api('/api/products');
+  ALL_PRODUCTS = products;
+  const cats = [...new Set(products.map(p => p.category))];
+  const sel = document.getElementById('categoryFilter');
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    renderGrid(v ? ALL_PRODUCTS.filter(p => p.category === v) : ALL_PRODUCTS);
+  });
+  renderGrid(products);
+}
+load();
+</script>
+</body>
+</html>
